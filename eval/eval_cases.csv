@@ -1,0 +1,3 @@
+case_no,question,expected_diagnosis,gold_chunk_doc_ids
+SYN-1,"[SYNTHETIC] What is the recommended first-line treatment for type 2 diabetes?",Type 2 diabetes management,SYN-DIABETES
+SYN-2,"[SYNTHETIC] Which medication class is commonly used for migraine prevention?",Migraine prophylaxis,SYN-MIGRAINE

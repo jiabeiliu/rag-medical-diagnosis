@@ -1,0 +1,8 @@
+package com.jiabeiliu.rag.web;
+
+/** One retrieved chunk cited in an answer. {@code score} is cosine distance (lower = more similar). */
+public record SourceDto(
+        long chunkId,
+        String docId,
+        double score) {
+}
