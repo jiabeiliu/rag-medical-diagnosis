@@ -5,6 +5,8 @@ Spring Boot 3.2, backed by **pgvector** on PostgreSQL 16. Ingest medical knowled
 documents, retrieve the most relevant chunks by cosine similarity, and generate
 grounded answers with citations — all in a Java stack.
 
+**[Live demo](https://muse.ai/s/rag-demo-xnr65xbxjcxmxyexh)** — interactive walkthrough of the pipeline: query embedding, top-k retrieval, grounded generation with citations.
+
 **Runs 100% free locally** via [Ollama](https://ollama.com): `nomic-embed-text`
 for embeddings (768-dim) and `llama3.1:8b` for generation. An optional paid
 OpenAI profile is one env var away.
