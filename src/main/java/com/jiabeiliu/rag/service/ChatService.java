@@ -29,6 +29,11 @@ import java.util.Map;
 @Service
 public class ChatService {
 
+    private static org.springframework.http.client.JdkClientHttpRequestFactory requestFactory() {
+        var factory=new org.springframework.http.client.JdkClientHttpRequestFactory(java.net.http.HttpClient.newBuilder().connectTimeout(java.time.Duration.ofSeconds(10)).build());
+        factory.setReadTimeout(java.time.Duration.ofSeconds(120));
+        return factory;
+    }
     private final EmbeddingService embeddingService;
     private final RetrievalService retrievalService;
     private final RestClient restClient;
@@ -44,6 +49,7 @@ public class ChatService {
         this.retrievalService = retrievalService;
         this.chatModel = chatModel;
         RestClient.Builder b = builder
+                .requestFactory(requestFactory())
                 .baseUrl(baseUrl)
                 .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE);
         if (apiKey != null && !apiKey.isBlank()) {
@@ -83,7 +89,8 @@ public class ChatService {
                 .retrieve()
                 .body(JsonNode.class);
 
-        String answer = root.path("choices").path(0).path("message").path("content").asText("");
+        String answer = root == null ? "" : root.path("choices").path(0).path("message").path("content").asText("");
+        if (answer.isBlank()) throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.BAD_GATEWAY, "Model returned an empty answer");
         return new QueryResponse(answer.strip(), sources);
     }
 }

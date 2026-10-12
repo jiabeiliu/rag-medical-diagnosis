@@ -30,6 +30,11 @@ public class RagController {
     }
 
     /** Ask a question: retrieve top-K chunks, then generate a grounded answer. */
+    @org.springframework.web.bind.annotation.DeleteMapping("/ingest/{docId}")
+    public java.util.Map<String,Object> delete(@org.springframework.web.bind.annotation.PathVariable String docId) {
+        return java.util.Map.of("docId", docId, "removedChunks", ingestService.delete(docId));
+    }
+
     @PostMapping("/query")
     public QueryResponse query(@Valid @RequestBody QueryRequest request) {
         return chatService.answer(request.question(), request.effectiveTopK());

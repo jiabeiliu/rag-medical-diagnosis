@@ -44,8 +44,7 @@ On the same 20-case medical-diagnosis task, the fine-tuned baseline
 
 Fine-tuning on a narrow distribution destroyed the base model's calibration.
 RAG takes the opposite approach: **freeze the model, fix the knowledge**.
-This service will be evaluated on the same 20 cases via `eval/` (hit@k + MRR
-for retrieval; answer-correctness hook ready to wire up).
+The current retrieval fixtures and answer-review workflow do not establish a matched 20-case RAG comparison. The fine-tune result is a separate small experiment; no RAG superiority or clinical accuracy is claimed.
 
 ## Free local setup
 
@@ -97,8 +96,7 @@ retrieves top-K chunks, and prints **hit@k** and **MRR** per case plus
 aggregates. Add your own rows (columns: `case_no,question,expected_diagnosis,
 gold_chunk_doc_ids` with pipe-separated doc ids) to evaluate on real
 (de-identified) data — e.g. the same 20 cases used for the fine-tuning
-baseline. Answer-level scoring is a stub hook
-(`EvalRunner#answerCorrectnessHook`) ready for an LLM judge.
+baseline. Answer generation can be enabled with `--eval.generate-answers=true`. `python3 scripts/evaluate.py --base http://localhost:8080` captures answers, evidence and latency for human review (see eval/REVIEW.md).
 
 ## Optional: OpenAI profile (paid)
 
@@ -136,5 +134,13 @@ it's blank (Ollama needs no key).
 - Fixed-size chunking can split sentences; a production version would use
   sentence/token-aware chunking.
 - No hybrid search (BM25) or reranking — pure dense retrieval.
-- Eval currently scores retrieval only; answer correctness is a stub.
+- Retrieval metrics are automated; answer correctness and support require human review. No clinical validation is claimed.
 - Local 8b generation is weaker than frontier APIs — the tradeoff for free.
+
+## Document lifecycle and service reliability
+
+Re-ingesting a docId atomically replaces its chunks instead of appending duplicates. Embeddings are computed before the replacement transaction; failed embedding preserves old data. Per-document PostgreSQL advisory locks serialize replacements and deletion. `DELETE /api/ingest/{docId}` removes that document. Unchanged content is re-embedded (content-hash caching is future work).
+
+Empty model output or upstream failures return explicit errors; generation uses bounded timeouts. Regression tests cover failed ingestion preserving data and replacement order. Run `mvn verify` plus `python3 -m unittest discover -s tests -v`.
+
+Compare chunking/top-k variants with the same corpus and eval/cases.json; no unmeasured performance gains are claimed.

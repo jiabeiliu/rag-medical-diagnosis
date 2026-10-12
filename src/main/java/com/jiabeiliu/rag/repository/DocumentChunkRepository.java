@@ -17,6 +17,8 @@ import java.util.List;
  */
 public interface DocumentChunkRepository extends JpaRepository<DocumentChunk, Long> {
 
+    long deleteByDocId(String docId);
+
     @Query(value = """
             SELECT dc.id, dc.doc_id, dc.chunk_index, dc.content,
                    (dc.embedding <=> CAST(:embedding AS vector)) AS score

@@ -37,9 +37,7 @@ import java.util.Set;
  * documents from {@code eval/synthetic_docs.csv} are ingested first, so the
  * eval runs end-to-end without any real data.
  *
- * <p>Answer correctness is intentionally a stub: wire an LLM judge or a
- * keyword check into {@link #answerCorrectnessHook} when you want
- * end-to-end answer scoring on top of retrieval metrics.
+ * Answer generation is optional; scripts/evaluate.py records outputs for human review.
  */
 @Component
 @ConditionalOnProperty(name = "eval.enabled", havingValue = "true")
@@ -48,17 +46,22 @@ public class EvalRunner implements CommandLineRunner {
     private final EmbeddingService embeddingService;
     private final RetrievalService retrievalService;
     private final IngestService ingestService;
+    private final com.jiabeiliu.rag.service.ChatService chatService;
+    private final boolean generateAnswers;
     private final int topK;
     private final boolean ingestSynthetic;
 
     public EvalRunner(EmbeddingService embeddingService,
                       RetrievalService retrievalService,
                       IngestService ingestService,
+                      com.jiabeiliu.rag.service.ChatService chatService,
+                      @Value("${eval.generate-answers:false}") boolean generateAnswers,
                       @Value("${eval.top-k:5}") int topK,
                       @Value("${eval.ingest-synthetic:true}") boolean ingestSynthetic) {
         this.embeddingService = embeddingService;
         this.retrievalService = retrievalService;
         this.ingestService = ingestService;
+        this.chatService=chatService; this.generateAnswers=generateAnswers;
         this.topK = topK;
         this.ingestSynthetic = ingestSynthetic;
     }
@@ -86,33 +89,17 @@ public class EvalRunner implements CommandLineRunner {
                 hits++;
                 mrrSum += 1.0 / rank;
             }
+            if (generateAnswers) System.out.println("[eval] answer for " + c.caseNo() + ": " + chatService.answer(c.question(), topK).answer());
             System.out.printf("[eval] case=%s hit@%d=%s mrr=%.3f expected=%s%n",
                     c.caseNo(), topK, hit, hit ? 1.0 / rank : 0.0, c.expectedDiagnosis());
         }
         System.out.printf("[eval] RESULT hit@%d=%.3f (%d/%d)  MRR=%.3f%n",
                 topK, (double) hits / cases.size(), hits, cases.size(), mrrSum / cases.size());
-        System.out.println("[eval] note: answer-correctness scoring is a stub — "
-                + "see EvalRunner#answerCorrectnessHook");
+        System.out.println("[eval] Answer review: python3 scripts/evaluate.py --base http://localhost:8080; human review required.");
     }
-
     private int firstHitRank(List<ScoredChunk> retrieved, Set<String> goldDocIds) {
-        for (int i = 0; i < retrieved.size(); i++) {
-            if (goldDocIds.contains(retrieved.get(i).docId())) {
-                return i + 1; // 1-based rank
-            }
-        }
+        for(int i=0;i<retrieved.size();i++) if(goldDocIds.contains(retrieved.get(i).docId())) return i+1;
         return 0;
-    }
-
-    /**
-     * Stub hook for answer-level correctness (e.g. LLM-as-judge comparing the
-     * generated answer against {@code expectedDiagnosis}). Returns empty until
-     * implemented.
-     */
-    protected OptionalDouble answerCorrectnessHook(String question, String expectedDiagnosis,
-                                                   String generatedAnswer) {
-        // TODO: implement, e.g. call the chat model with a grading prompt.
-        return OptionalDouble.empty();
     }
 
     private void ingestSyntheticDocs() throws IOException {
