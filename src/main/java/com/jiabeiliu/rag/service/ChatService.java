@@ -37,6 +37,8 @@ public class ChatService {
     private final EmbeddingService embeddingService;
     private final RetrievalService retrievalService;
     private final RestClient restClient;
+    @Value("${llm.max-tokens:512}")
+    private int maxTokens = 512;
     private final String chatModel;
 
     public ChatService(EmbeddingService embeddingService,
@@ -65,8 +67,8 @@ public class ChatService {
         StringBuilder context = new StringBuilder();
         List<SourceDto> sources = new ArrayList<>();
         for (ScoredChunk c : chunks) {
-            context.append("[chunk ").append(c.chunkId())
-                    .append(" | doc ").append(c.docId()).append("]\n")
+            context.append("[chunk:").append(c.chunkId())
+                    .append("] doc: ").append(c.docId()).append("\n")
                     .append(c.content()).append("\n\n");
             sources.add(new SourceDto(c.chunkId(), c.docId(), c.score()));
         }
@@ -78,6 +80,7 @@ public class ChatService {
 
         Map<String, Object> body = Map.of(
                 "model", chatModel,
+                "max_tokens", maxTokens,
                 "temperature", 0.0,
                 "messages", List.of(
                         Map.of("role", "system", "content", system),
@@ -91,6 +94,17 @@ public class ChatService {
 
         String answer = root == null ? "" : root.path("choices").path(0).path("message").path("content").asText("");
         if (answer.isBlank()) throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.BAD_GATEWAY, "Model returned an empty answer");
+        answer = guardedAnswer(answer, chunks);
         return new QueryResponse(answer.strip(), sources);
+    }
+    static String guardedAnswer(String answer, List<ScoredChunk> chunks) {
+        var matcher=java.util.regex.Pattern.compile("\\[chunk:(\\d+)\\]").matcher(answer);
+        var allowed=chunks.stream().map(c->Long.toString(c.chunkId())).collect(java.util.stream.Collectors.toSet());
+        boolean cited=false;
+        while(matcher.find()) {
+            if(!allowed.contains(matcher.group(1))) return "Insufficient verified evidence: the model referenced unavailable sources.";
+            cited=true;
+        }
+        return cited ? answer : "Insufficient cited evidence to answer this question. No unsupported model answer is returned.";
     }
 }
